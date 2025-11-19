@@ -1,6 +1,8 @@
 import { createApp } from './app';
 import { createLogger } from './lib/logger';
 import { getConfig } from './config/loader';
+import { webSocketService } from './services/websocket';
+import { databaseService } from './services/database';
 
 async function main(): Promise<void> {
   const config = getConfig();
@@ -8,9 +10,9 @@ async function main(): Promise<void> {
 
   logger.info(`Starting server in ${config.nodeEnv} mode`);
 
-  const app = createApp(logger);
+  const { app, server } = createApp(logger);
 
-  const server = app.listen(config.port, () => {
+  server.listen(config.port, () => {
     logger.info(`Server listening on port ${config.port}`);
     logger.info(`Environment: ${config.nodeEnv}`);
     logger.info(`Log level: ${config.logLevel}`);
@@ -18,6 +20,14 @@ async function main(): Promise<void> {
 
   const gracefulShutdown = (): void => {
     logger.info('Received shutdown signal, closing gracefully...');
+
+    // Close WebSocket service
+    webSocketService.close();
+    
+    // Close database connection
+    databaseService.disconnect().catch(error => {
+      logger.error({ error }, 'Error closing database connection');
+    });
 
     server.close(() => {
       logger.info('Server closed');

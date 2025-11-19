@@ -33,9 +33,31 @@ export const configSchema = z.object({
   sqsQueueUrl: z.string().url('Invalid SQS_QUEUE_URL').optional(),
   sqsRegion: z.string().default('us-east-1'),
 
+  // File Upload Limits
+  maxFileSize: z.number().int().positive().default(500 * 1024 * 1024), // 500MB
+  maxBatchSize: z.number().int().positive().default(2 * 1024 * 1024 * 1024), // 2GB
+  allowedMimeTypes: z.array(z.string()).default([
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain',
+    'text/csv',
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'video/mp4',
+    'video/mpeg',
+    'audio/mpeg',
+    'audio/wav'
+  ]),
+
   // Feature flags
   enableOpenTelemetry: z.boolean().default(false),
   enableDetailedLogging: z.boolean().default(false),
+  enableVirusScanning: z.boolean().default(false),
+  enableWebSocketEvents: z.boolean().default(true),
 });
 
 export type Config = z.infer<typeof configSchema>;
