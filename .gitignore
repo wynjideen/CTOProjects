@@ -7,6 +7,11 @@ vendor/
 .pnp
 .pnp.js
 
+# Python virtual environments
+.venv/
+venv/
+env/
+
 # Testing
 coverage/
 *.cover
@@ -59,3 +64,7 @@ pids/
 # OS
 Thumbs.db
 .DS_Store
+
+# Temporary files
+tmp/
+temp/
