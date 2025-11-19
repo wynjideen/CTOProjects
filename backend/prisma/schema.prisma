@@ -1,0 +1,251 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  directUrl         = env("DIRECT_DATABASE_URL")
+}
+
+enum UserRole {
+  LEARNER
+  ADMIN
+}
+
+model User {
+  id                String            @id @default(uuid()) @db.Uuid
+  email             String            @unique(map: "idx_users_email") @db.VarChar(255)
+  username          String            @unique(map: "idx_users_username") @db.VarChar(50)
+  passwordHash      String            @map("password_hash") @db.VarChar(255)
+  firstName         String?           @map("first_name") @db.VarChar(100)
+  lastName          String?           @map("last_name") @db.VarChar(100)
+  profilePictureUrl String?           @map("profile_picture_url") @db.VarChar(500)
+  preferences       Json?             @db.JsonB
+  role              UserRole          @default(LEARNER)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime?         @map("deleted_at") @db.Timestamptz(6)
+  isActive          Boolean           @default(true) @map("is_active")
+  lastLoginAt       DateTime?         @map("last_login_at") @db.Timestamptz(6)
+  studyMaterials    StudyMaterial[]
+  sessions          LearningSession[]
+  interactions      Interaction[]
+  feedback          UserFeedback[]
+  progressMetrics   ProgressMetric[]
+  auditLogs         AuditLog[]
+
+  @@index([createdAt], map: "idx_users_created_at")
+  @@index([isActive, deletedAt], map: "idx_users_is_active_deleted_at")
+  @@map("users")
+}
+
+model StudyMaterial {
+  id               String            @id @default(uuid()) @db.Uuid
+  userId           String            @map("user_id") @db.Uuid
+  title            String            @db.VarChar(255)
+  description      String?           @db.Text
+  sourceUrl        String?           @map("source_url") @db.VarChar(1000)
+  sourceType       String            @map("source_type") @db.VarChar(50)
+  metadata         Json?             @db.JsonB
+  status           String            @default("processing") @db.VarChar(20)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?         @map("deleted_at") @db.Timestamptz(6)
+  contentLength    Int?              @map("content_length")
+  difficultyLevel  String?           @map("difficulty_level") @db.VarChar(20)
+  subjectArea      String?           @map("subject_area") @db.VarChar(100)
+  tags             String[]          @default([]) @db.Text
+  createdBy        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentChunks    ContentChunk[]
+  generatedAssets  GeneratedAsset[]
+  learningSessions LearningSession[]
+
+  @@index([userId], map: "idx_study_materials_user_id")
+  @@index([status], map: "idx_study_materials_status")
+  @@index([createdAt], map: "idx_study_materials_created_at")
+  @@index([subjectArea], map: "idx_study_materials_subject_area")
+  @@index([tags], map: "idx_study_materials_tags", type: Gin)
+  @@index([deletedAt], map: "idx_study_materials_deleted_at")
+  @@map("study_materials")
+}
+
+model ContentChunk {
+  id              String           @id @default(uuid()) @db.Uuid
+  studyMaterialId String           @map("study_material_id") @db.Uuid
+  chunkOrder      Int              @map("chunk_order")
+  content         String           @db.Text
+  chunkType       String           @map("chunk_type") @db.VarChar(50)
+  metadata        Json?            @db.JsonB
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  wordCount       Int?             @map("word_count")
+  language        String?          @db.VarChar(10)
+  summary         String?          @db.Text
+  relevanceScore  Float?           @map("relevance_score") @db.DoublePrecision
+  studyMaterial   StudyMaterial    @relation(fields: [studyMaterialId], references: [id], onDelete: Cascade)
+  generatedAssets GeneratedAsset[]
+
+  @@index([studyMaterialId], map: "idx_content_chunks_study_material_id")
+  @@index([studyMaterialId, chunkOrder], map: "idx_content_chunks_chunk_order")
+  @@index([chunkType], map: "idx_content_chunks_chunk_type")
+  @@index([relevanceScore], map: "idx_content_chunks_relevance_score")
+  @@index([language], map: "idx_content_chunks_language")
+  @@map("content_chunks")
+}
+
+model GeneratedAsset {
+  id               String         @id @default(uuid()) @db.Uuid
+  studyMaterialId  String         @map("study_material_id") @db.Uuid
+  contentChunkId   String?        @map("content_chunk_id") @db.Uuid
+  assetType        String         @map("asset_type") @db.VarChar(50)
+  content          Json           @db.JsonB
+  metadata         Json?          @db.JsonB
+  generationModel  String         @map("generation_model") @db.VarChar(100)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  status           String         @default("ready") @db.VarChar(20)
+  qualityScore     Float?         @map("quality_score") @db.DoublePrecision
+  difficultyLevel  Int?           @map("difficulty_level")
+  generationParams Json?          @map("generation_params") @db.JsonB
+  studyMaterial    StudyMaterial  @relation(fields: [studyMaterialId], references: [id], onDelete: Cascade)
+  contentChunk     ContentChunk?  @relation(fields: [contentChunkId], references: [id], onDelete: SetNull)
+  interactions     Interaction[]
+  feedback         UserFeedback[]
+
+  @@index([studyMaterialId], map: "idx_generated_assets_study_material_id")
+  @@index([contentChunkId], map: "idx_generated_assets_content_chunk_id")
+  @@index([assetType], map: "idx_generated_assets_asset_type")
+  @@index([status], map: "idx_generated_assets_status")
+  @@index([qualityScore], map: "idx_generated_assets_quality_score")
+  @@index([difficultyLevel], map: "idx_generated_assets_difficulty_level")
+  @@index([createdAt], map: "idx_generated_assets_created_at")
+  @@map("generated_assets")
+}
+
+model LearningSession {
+  id                   String           @id @default(uuid()) @db.Uuid
+  userId               String           @map("user_id") @db.Uuid
+  studyMaterialId      String           @map("study_material_id") @db.Uuid
+  startedAt            DateTime         @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt              DateTime?        @map("ended_at") @db.Timestamptz(6)
+  sessionType          String           @map("session_type") @db.VarChar(50)
+  sessionData          Json?            @map("session_data") @db.JsonB
+  totalInteractions    Int              @default(0) @map("total_interactions")
+  completionPercentage Float            @default(0) @map("completion_percentage") @db.DoublePrecision
+  status               String           @default("active") @db.VarChar(20)
+  configuration        Json?            @db.JsonB
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studyMaterial        StudyMaterial    @relation(fields: [studyMaterialId], references: [id], onDelete: Cascade)
+  interactions         Interaction[]
+  progressMetrics      ProgressMetric[]
+
+  @@index([userId], map: "idx_learning_sessions_user_id")
+  @@index([studyMaterialId], map: "idx_learning_sessions_study_material_id")
+  @@index([startedAt], map: "idx_learning_sessions_started_at")
+  @@index([status], map: "idx_learning_sessions_status")
+  @@index([sessionType], map: "idx_learning_sessions_session_type")
+  @@index([completionPercentage], map: "idx_learning_sessions_completion_percentage")
+  @@map("learning_sessions")
+}
+
+model Interaction {
+  id                String          @id @default(uuid()) @db.Uuid
+  learningSessionId String          @map("learning_session_id") @db.Uuid
+  generatedAssetId  String?         @map("generated_asset_id") @db.Uuid
+  userId            String          @map("user_id") @db.Uuid
+  interactionType   String          @map("interaction_type") @db.VarChar(50)
+  interactionData   Json            @map("interaction_data") @db.JsonB
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  isCorrect         Boolean?        @map("is_correct")
+  responseTimeMs    Int?            @map("response_time_ms")
+  confidenceLevel   Float?          @map("confidence_level") @db.DoublePrecision
+  feedbackData      Json?           @map("feedback_data") @db.JsonB
+  learningSession   LearningSession @relation(fields: [learningSessionId], references: [id], onDelete: Cascade)
+  generatedAsset    GeneratedAsset? @relation(fields: [generatedAssetId], references: [id], onDelete: SetNull)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userFeedback      UserFeedback[]
+
+  @@index([learningSessionId], map: "idx_interactions_learning_session_id")
+  @@index([generatedAssetId], map: "idx_interactions_generated_asset_id")
+  @@index([userId], map: "idx_interactions_user_id")
+  @@index([createdAt], map: "idx_interactions_created_at")
+  @@index([interactionType], map: "idx_interactions_interaction_type")
+  @@index([isCorrect], map: "idx_interactions_is_correct")
+  @@map("interactions")
+}
+
+model UserFeedback {
+  id               String          @id @default(uuid()) @db.Uuid
+  userId           String          @map("user_id") @db.Uuid
+  generatedAssetId String?         @map("generated_asset_id") @db.Uuid
+  interactionId    String?         @map("interaction_id") @db.Uuid
+  feedbackType     String          @map("feedback_type") @db.VarChar(50)
+  rating           Int?            @db.SmallInt
+  comment          String?         @db.Text
+  metadata         Json?           @db.JsonB
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  status           String          @default("active") @db.VarChar(20)
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generatedAsset   GeneratedAsset? @relation(fields: [generatedAssetId], references: [id], onDelete: SetNull)
+  interaction      Interaction?    @relation(fields: [interactionId], references: [id], onDelete: SetNull)
+
+  @@index([userId], map: "idx_user_feedback_user_id")
+  @@index([generatedAssetId], map: "idx_user_feedback_generated_asset_id")
+  @@index([interactionId], map: "idx_user_feedback_interaction_id")
+  @@index([feedbackType], map: "idx_user_feedback_feedback_type")
+  @@index([rating], map: "idx_user_feedback_rating")
+  @@index([createdAt], map: "idx_user_feedback_created_at")
+  @@map("user_feedback")
+}
+
+model ProgressMetric {
+  id                String           @id @default(uuid()) @db.Uuid
+  userId            String           @map("user_id") @db.Uuid
+  learningSessionId String?          @map("learning_session_id") @db.Uuid
+  metricType        String           @map("metric_type") @db.VarChar(50)
+  metricValue       Float            @map("metric_value") @db.DoublePrecision
+  metricData        Json?            @map("metric_data") @db.JsonB
+  recordedAt        DateTime         @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  timePeriod        String?          @map("time_period") @db.VarChar(20)
+  subjectArea       String?          @map("subject_area") @db.VarChar(100)
+  aggregationType   String?          @map("aggregation_type") @db.VarChar(20)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  learningSession   LearningSession? @relation(fields: [learningSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId], map: "idx_progress_metrics_user_id")
+  @@index([learningSessionId], map: "idx_progress_metrics_learning_session_id")
+  @@index([metricType], map: "idx_progress_metrics_metric_type")
+  @@index([recordedAt], map: "idx_progress_metrics_recorded_at")
+  @@index([timePeriod], map: "idx_progress_metrics_time_period")
+  @@index([subjectArea], map: "idx_progress_metrics_subject_area")
+  @@map("progress_metrics")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
+  action       String   @db.VarChar(100)
+  entityType   String   @map("entity_type") @db.VarChar(50)
+  entityId     String?  @map("entity_id") @db.Uuid
+  oldValues    Json?    @map("old_values") @db.JsonB
+  newValues    Json?    @map("new_values") @db.JsonB
+  ipAddress    String?  @map("ip_address") @db.Inet
+  userAgent    String?  @map("user_agent") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  sessionId    String?  @map("session_id") @db.VarChar(255)
+  isSuccess    Boolean  @default(true) @map("is_success")
+  errorMessage String?  @map("error_message") @db.Text
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId], map: "idx_audit_logs_user_id")
+  @@index([action], map: "idx_audit_logs_action")
+  @@index([entityType], map: "idx_audit_logs_entity_type")
+  @@index([entityId], map: "idx_audit_logs_entity_id")
+  @@index([createdAt], map: "idx_audit_logs_created_at")
+  @@index([isSuccess], map: "idx_audit_logs_is_success")
+  @@index([sessionId], map: "idx_audit_logs_session_id")
+  @@map("audit_logs")
+}
