@@ -16,7 +16,18 @@ export function loadConfig(): Config {
     s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN,
-    oauthProviderUrl: process.env.OAUTH_PROVIDER_URL,
+    oidcProvider: process.env.OIDC_PROVIDER,
+    oidcDomain: process.env.OIDC_DOMAIN,
+    oidcClientId: process.env.OIDC_CLIENT_ID,
+    oidcClientSecret: process.env.OIDC_CLIENT_SECRET,
+    oidcAudience: process.env.OIDC_AUDIENCE,
+    oidcJwksUri: process.env.OIDC_JWKS_URI,
+    sessionTimeoutMinutes: process.env.SESSION_TIMEOUT_MINUTES
+      ? parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10)
+      : 30,
+    sessionAbsoluteTimeoutHours: process.env.SESSION_ABSOLUTE_TIMEOUT_HOURS
+      ? parseInt(process.env.SESSION_ABSOLUTE_TIMEOUT_HOURS, 10)
+      : 24,
     llmProvider: process.env.LLM_PROVIDER,
     llmApiKey: process.env.LLM_API_KEY,
     llmModel: process.env.LLM_MODEL,

@@ -18,10 +18,17 @@ export const configSchema = z.object({
   s3AccessKeyId: z.string().min(1),
   s3SecretAccessKey: z.string().min(1),
 
-  // Authentication
+  // Authentication & OIDC
   jwtSecret: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   jwtExpiresIn: z.string().default('24h'),
-  oauthProviderUrl: z.string().url('Invalid OAUTH_PROVIDER_URL').optional(),
+  oidcProvider: z.enum(['auth0', 'cognito']).optional(),
+  oidcDomain: z.string().optional(),
+  oidcClientId: z.string().optional(),
+  oidcClientSecret: z.string().optional(),
+  oidcAudience: z.string().optional(),
+  oidcJwksUri: z.string().url().optional(),
+  sessionTimeoutMinutes: z.number().int().positive().default(30),
+  sessionAbsoluteTimeoutHours: z.number().int().positive().default(24),
 
   // LLM Provider
   llmProvider: z.enum(['openai', 'anthropic', 'azure']).default('openai'),
