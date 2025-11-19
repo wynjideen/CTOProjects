@@ -1,12 +1,32 @@
 import { createApp } from './app';
 import { createLogger } from './lib/logger';
 import { getConfig } from './config/loader';
+import { initializeOIDC } from './lib/oidc';
+import { initializeSessionManager } from './lib/session';
 
 async function main(): Promise<void> {
   const config = getConfig();
   const logger = createLogger(config);
 
   logger.info(`Starting server in ${config.nodeEnv} mode`);
+
+  try {
+    // Initialize OIDC if configured
+    if (config.oidcProvider) {
+      logger.info(
+        { provider: config.oidcProvider },
+        'Initializing OIDC provider'
+      );
+      await initializeOIDC(logger);
+    }
+
+    // Initialize session manager
+    logger.info('Initializing session manager');
+    await initializeSessionManager(logger);
+  } catch (error) {
+    logger.error(error, 'Failed to initialize auth services');
+    process.exit(1);
+  }
 
   const app = createApp(logger);
 

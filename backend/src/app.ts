@@ -3,6 +3,7 @@ import pino from 'pino';
 import { createHttpLogger } from './lib/logger';
 import { createErrorHandler } from './middleware/errorHandler';
 import { setupHealthRoutes } from './routes/health';
+import { setupAuthRoutes } from './modules/auth/routes';
 import { setupFileIngestionRoutes } from './modules/file-ingestion/routes';
 import { setupContentProcessingRoutes } from './modules/content-processing/routes';
 import { setupLearningOrchestrationRoutes } from './modules/learning-orchestration/routes';
@@ -22,6 +23,11 @@ export function createApp(logger: pino.Logger): Express {
 
   // API v1 routes
   const apiV1Router = express.Router();
+
+  // Auth Module (no auth required for token endpoints)
+  const authRouter = express.Router();
+  setupAuthRoutes(authRouter, logger);
+  apiV1Router.use('/auth', authRouter);
 
   // File Ingestion Module
   const filesRouter = express.Router();
