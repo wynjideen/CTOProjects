@@ -1,89 +1,76 @@
-# Backend Data Layer
+# Backend Service & Data Layer
 
-This package bootstraps the PostgreSQL data model for CTOProjects with Prisma. It mirrors the schema defined in `docs/database/schema.md`, provides repeatable migrations, and ships an idempotent seed script for baseline data used by automated tests and manual QA flows.
+This package contains the Node.js backend bootstrap for CTOProjects. It exposes a typed Express server for rapid feature work and a Prisma-based data layer that mirrors the schema defined in `docs/database/schema.md`.
 
-## Requirements
+## Stack Overview
 
-- Node.js 18+
-- npm 10+
-- Docker (optional but recommended for the local Postgres instance)
-- PostgreSQL 14+ (the migrations were tested with Postgres 15)
+- **Language:** TypeScript (strict mode) compiled to CommonJS
+- **HTTP:** Express with structured logging via Pino + request correlation IDs
+- **Config:** Centralized Zod schema with environment validation on boot
+- **Error Handling:** Typed `AppError` hierarchy with consistent JSON responses
+- **Testing:** Vitest with coverage hooks ready
+- **ORM:** Prisma Client targeting PostgreSQL with migrations + seed data
+
+## Getting Started
+
+```bash
+cd backend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+The development server runs with `tsx` in watch mode. Health endpoints are available at `GET /health` and `GET /ready`.
 
 ## Environment Variables
 
-Copy the example file and adjust the URLs to match your environment:
+Refer to `.env.example` for a full list. Critical values:
 
-```bash
-cp .env.example .env
-```
-
-| Variable | Purpose |
+| Variable | Description |
 | --- | --- |
-| `DATABASE_URL` | Primary connection string (can point to PgBouncer or another pooled endpoint). Include `pgbouncer=true`, `connection_limit`, and `pool_timeout` flags when routing through PgBouncer. |
-| `DIRECT_DATABASE_URL` | Direct connection that bypasses PgBouncer for administrative tasks such as running migrations or Prisma Studio. Point it at the underlying Postgres host. |
-| `SHADOW_DATABASE_URL` | Dedicated database/schema used by Prisma Migrate and automated tests. Should live on the same server as the primary database. |
+| `PORT` | HTTP port for the Express server (default 3000). |
+| `DATABASE_URL` | Primary Prisma/PostgreSQL connection string (PgBouncer safe). |
+| `DIRECT_DATABASE_URL` | Direct connection for migrations and Prisma Studio. |
+| `SHADOW_DATABASE_URL` | Shadow database used by Prisma migrate/tests. |
+| `JWT_SECRET` | 32+ character signing key for auth tokens. |
 
-> **Tip:** When PgBouncer runs in transaction mode, keep `DIRECT_DATABASE_URL` pointing to the raw Postgres service so that Prisma can run long‑lived migrations without exhausting pooled connections.
+## NPM Scripts
 
-## Local Database (Docker)
-
-A helper Compose file is provided for convenience:
-
-```bash
-# start postgres and keep it running
-npm install
-docker compose up -d postgres
-
-# create the shadow database the first time
-docker compose exec postgres psql -U postgres -c "CREATE DATABASE ctoprojects_shadow;"
-```
-
-Update your `.env` file so that both `DATABASE_URL` and `DIRECT_DATABASE_URL` match the credentials defined in `docker-compose.yml` (default `postgres/postgres`).
-
-## Common Commands
-
-| Action | Command |
+| Command | Description |
 | --- | --- |
-| Format schema | `npm run prisma:format` |
-| Generate Prisma Client | `npm run prisma:generate` |
-| Open Prisma Studio | `npm run prisma:studio` |
-| Create / apply dev migrations | `npm run prisma:migrate dev` |
-| Apply migrations in CI / prod | `npm run prisma:migrate:deploy` |
-| Reset database (drops & reapplies) | `npm run db:reset` |
-| Seed baseline data | `npm run db:seed` |
+| `npm run dev` | Start the Express server with hot reload. |
+| `npm run build` | Type-check and emit JavaScript to `dist/`. |
+| `npm run start` | Run the compiled server. |
+| `npm run lint` | ESLint across the TypeScript source. |
+| `npm run format` | Prettier for the entire repo. |
+| `npm run test` | Execute Vitest in CI mode. |
+| `npm run prisma:generate` | Generate Prisma Client types. |
+| `npm run prisma:migrate dev` | Apply new migrations locally. |
+| `npm run prisma:migrate:deploy` | Apply migrations in CI/prod. |
+| `npm run db:seed` | Seed baseline data (admin + learner demo flows). |
 
-Running `npm run prisma:migrate dev` from the `backend` folder will create the full schema (users, study_materials, content_chunks, generated_assets, learning_sessions, interactions, user_feedback, progress_metrics, audit_logs) exactly as described in the database specification. The command also builds the Prisma Client so TypeScript definitions are ready for consumption.
+## Database & Prisma Workflow
 
-## Seeding Baseline Data
+1. Start Postgres (see `docker-compose.yml` for a local container) or point `DATABASE_URL` at an existing instance.
+2. Create the shadow database once: `createdb ctoprojects_shadow` (or via `docker compose exec postgres psql -U postgres -c "CREATE DATABASE ctoprojects_shadow;"`).
+3. Run `npm run prisma:migrate dev` to apply the schema. The generated SQL aligns with the ERD in `docs/database/schema.md` (users, study_materials, content_chunks, generated_assets, learning_sessions, interactions, user_feedback, progress_metrics, audit_logs plus enum + indexes).
+4. Generate the Prisma Client (`npm run prisma:generate`) and import it where needed.
+5. Seed base data with `npm run db:seed`. The script is idempotent and provisions:
+   - Admin + learner demo accounts
+   - Sample study material, chunk, and generated asset
+   - A learning session, interaction, feedback, progress metric, and audit log entry
 
-`npm run db:seed` inserts:
+## Development Workflow
 
-- Default roles via enum backed users (Admin + Learner accounts)
-- A demo learner user (`learner@ctoprojects.dev`)
-- Sample study material, chunk, generated asset, and learning session
-- Reference interaction, user feedback, progress metric, and audit log entries
-
-The script is idempotent; you can run it multiple times without duplicating rows. Use the seeded data to validate API flows, smoke tests, or development demos.
-
-## Manual Postgres Setup (without Docker)
-
-If you prefer a local Postgres installation, create the databases manually and then run the migrations:
-
-```bash
-createdb ctoprojects
-createdb ctoprojects_shadow
-npm run prisma:migrate dev
-npm run db:seed
-```
-
-## Testing Notes
-
-- Automated tests should point to the same schema and run `npm run prisma:migrate dev` (or `npm run prisma:migrate:deploy`) before executing queries.
-- Use the shadow database to keep migration history isolated from the primary pool.
-- Prisma Client respects the pooling flags inside `DATABASE_URL`, so the generated client is PgBouncer‑safe by default.
+- `src/app.ts` wires up core middleware, module routers, and OpenAPI stubs.
+- `src/modules/*` directories host per-domain routers (file ingestion, content processing, orchestration, progress tracking, jobs). The handlers currently return `501` responses as scaffolding for future features.
+- Add new dependencies via `npm install <pkg>` and update TypeScript types accordingly.
+- Keep `tsconfig.json`, `.eslintrc.json`, and `.prettierrc.json` in sync with team standards.
 
 ## Troubleshooting
 
-- **`DATABASE_URL` not set**: ensure your `.env` file exists or export the variables in your shell; Prisma’s new config loader does not read `.env` automatically unless the variables are defined.
-- **Migrations timing out via PgBouncer**: point `DIRECT_DATABASE_URL` to the raw Postgres host and set `DATABASE_URL` to the pooled endpoint.
-- **Seeding errors about foreign keys**: confirm migrations ran successfully and that the seed script is executed against a clean database.
+- **Config validation failures**: check the console output; Zod lists the missing/invalid environment variables.
+- **Prisma complaining about PgBouncer**: ensure `DIRECT_DATABASE_URL` points to the raw Postgres service and that migration commands use it automatically.
+- **Seed script foreign key errors**: confirm `npm run prisma:migrate dev` succeeded and you are targeting the correct database.
+
+For deeper architectural guidance (module responsibilities, async workflows, logging strategy) see `DEVELOPMENT.md`.
