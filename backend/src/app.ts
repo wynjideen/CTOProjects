@@ -1,4 +1,5 @@
 import express, { Express } from 'express';
+import { createServer } from 'http';
 import pino from 'pino';
 import { createHttpLogger } from './lib/logger';
 import { createErrorHandler } from './middleware/errorHandler';
@@ -8,9 +9,20 @@ import { setupContentProcessingRoutes } from './modules/content-processing/route
 import { setupLearningOrchestrationRoutes } from './modules/learning-orchestration/routes';
 import { setupProgressTrackingRoutes } from './modules/progress-tracking/routes';
 import { setupJobRoutes } from './modules/jobs/routes';
+import { webSocketService } from './services/websocket';
+import { jobQueueService } from './services/job-queue';
 
-export function createApp(logger: pino.Logger): Express {
+export function createApp(logger: pino.Logger): { app: Express; server: any } {
   const app = express();
+  const server = createServer(app);
+
+  // Initialize WebSocket service
+  webSocketService.setupWSS(server);
+
+  // Start job queue processing
+  jobQueueService.processJobs().catch(error => {
+    logger.error({ error }, 'Failed to start job queue processing');
+  });
 
   // Middleware
   app.use(express.json());
@@ -75,6 +87,25 @@ export function createApp(logger: pino.Logger): Express {
             description: 'See docs/backend/api-spec.md for full specification',
           },
         },
+        '/files/batch-upload': {
+          post: {
+            summary: 'Upload multiple files',
+            tags: ['File Ingestion'],
+            description: 'See docs/backend/api-spec.md for full specification',
+          },
+        },
+        '/files/{fileId}': {
+          get: {
+            summary: 'Get file metadata',
+            tags: ['File Ingestion'],
+            description: 'See docs/backend/api-spec.md for full specification',
+          },
+          delete: {
+            summary: 'Delete file',
+            tags: ['File Ingestion'],
+            description: 'See docs/backend/api-spec.md for full specification',
+          },
+        },
         '/content/search': {
           post: {
             summary: 'Search content by vector similarity',
@@ -120,5 +151,5 @@ export function createApp(logger: pino.Logger): Express {
   // Error handling middleware
   app.use(createErrorHandler(logger));
 
-  return app;
+  return { app, server };
 }

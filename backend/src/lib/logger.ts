@@ -4,8 +4,10 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Request, Response, NextFunction } from 'express';
 import type { Config } from '../config/schema';
 
+let defaultLogger: pino.Logger;
+
 export function createLogger(config: Config): pino.Logger {
-  return pino({
+  const logger = pino({
     level: config.logLevel,
     transport: {
       target: 'pino-pretty',
@@ -16,6 +18,10 @@ export function createLogger(config: Config): pino.Logger {
       },
     },
   });
+  
+  // Store as default logger for use without request context
+  defaultLogger = logger;
+  return logger;
 }
 
 export function createHttpLogger(
@@ -34,6 +40,15 @@ export function createHttpLogger(
   );
 }
 
-export function getRequestId(req: Request): string {
-  return (req.id as string) || uuidv4();
+export function getRequestId(req?: Request): pino.Logger {
+  if (req) {
+    return (req as any).logger || defaultLogger || pino();
+  }
+  // Return default logger when no request context
+  return defaultLogger || pino();
+}
+
+// Export a default logger instance for services that don't have request context
+export function getDefaultLogger(): pino.Logger {
+  return defaultLogger || pino();
 }
