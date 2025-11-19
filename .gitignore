@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+npm-debug.log
+package-lock.json
+yarn.lock
+vendor/
+.pnp
+.pnp.js
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Testing
+coverage/
+*.cover
+.pytest_cache/
+.coverage
+.nyc_output/
+
+# Build outputs
+dist/
+build/
+*.js
+*.jsx
+*.egg-info/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary files
+tmp/
+temp/
